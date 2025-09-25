@@ -1,4 +1,6 @@
 from django.contrib import admin, messages   # админка и сообщения
+from django.utils.safestring import mark_safe
+
 from .models import Women, Category          # импортируем модели
 
 
@@ -25,13 +27,13 @@ class MarriedFilter(admin.SimpleListFilter):
 # Настройка админки для Women
 @admin.register(Women)
 class WomenAdmin(admin.ModelAdmin):
-    fields = ['title', 'slug', 'content', 'cat', 'husband', 'tags']  # поля формы
+    fields = ['title', 'slug', 'content', 'photo', 'post_photo', 'cat', 'husband', 'tags']  # поля формы
     # exclude = ['tags', 'is_published']
-    # readonly_fields = ['slug']
+    readonly_fields = ['post_photo']
     prepopulated_fields = {'slug': ('title',)}  # автогенерация slug
     # filter_horizontal = ('tags',)
     filter_vertical = ['tags']                  # выбор тегов вертикально
-    list_display = ('title', 'time_create', 'is_published', 'cat', 'brief_info')  # колонки списка
+    list_display = ('title', 'post_photo', 'time_create', 'is_published', 'cat')  # колонки списка
     list_display_links = ('title',)             # кликабельные поля
     ordering = ['-time_create', 'title']        # сортировка по умолчанию
     list_editable = ("is_published", )          # быстрое редактирование
@@ -39,11 +41,14 @@ class WomenAdmin(admin.ModelAdmin):
     actions = ['set_published', 'set_draft']    # действия
     search_fields = ['title__startswith', 'cat__name']  # поиск
     list_filter = [MarriedFilter, 'cat__name', 'is_published']  # фильтры
+    save_on_top = True
 
-    @admin.display(description="Краткое описание", ordering="content")
-    def brief_info(self, women: Women):
-        # выводим длину контента
-        return f"Описание {len(women.content)} символов."
+    @admin.display(description="Изображение", ordering="content")
+    def post_photo(self, women: Women):
+        if women.photo:
+            return mark_safe(f"<img src='{women.photo.url}' width=50>")
+        else:
+            return "Без фото"
 
     @admin.action(description="Опубликовать выбранные записи")
     def set_published(self, request, queryset):
