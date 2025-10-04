@@ -1,7 +1,9 @@
 from django.http import HttpResponse, HttpResponseNotFound, Http404, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.template.loader import render_to_string
+from django.views import View
+from django.views.generic import TemplateView, ListView, DetailView, FormView, CreateView, UpdateView
 
 from .forms import AddPostForm, UploadFileForm
 from .models import Women, Category, TagPost, UploadFiles
@@ -13,6 +15,7 @@ menu = [{'title': "О сайте", 'url_name': 'about'},
 ]
 
 
+"""
 def index(request): # HttpRequest
     posts = Women.published.all().select_related('cat')
 
@@ -23,6 +26,28 @@ def index(request): # HttpRequest
         'cat_selected': 0,
     }
     return render(request, 'women/index.html', context=data)
+"""
+
+class WomenHome(ListView):
+    # model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+    extra_context = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'cat_selected': 0,
+    }
+
+    def get_queryset(self):
+        return Women.published.all().select_related('cat')
+
+    #template_name = 'women/index.html'
+    #extra_context = {
+    #    'title': 'Главная страница',
+    #    'menu': menu,
+    #    'posts': Women.published.all().select_related('cat'),
+    #    'cat_selected': 0,
+    #}
 
 # def handle_uploaded_file(f):
 #    with open(f"uploads/{f.name}", "wb+") as destination:
@@ -52,6 +77,23 @@ def show_post(request, post_slug):
 
     return render(request, 'women/post.html', data)
 
+
+class ShowPost(DetailView):
+    # model = Women
+    template_name = 'women/post.html'
+    slug_url_kwarg = 'post_slug'
+    context_object_name = 'post'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = context['post'].title
+        context['menu'] = menu
+        return context
+
+    def get_object(self, queryset = None):
+        return get_object_or_404(Women.published, slug=self.kwargs[self.slug_url_kwarg])
+
+"""
 def addpage(request):
     if request.method == 'POST':
         form = AddPostForm(request.POST, request.FILES)
@@ -73,6 +115,54 @@ def addpage(request):
         'form': form
     }
     return render(request, 'women/addpage.html', data)
+"""
+
+"""
+class AddPage(View):
+    def get(self, request):
+        form = AddPostForm()
+        data = {
+            'menu': menu,
+            'title': 'Добавление статьи',
+            'form': form
+        }
+        return render(request, 'women/addpage.html', data)
+
+    def post(self, request):
+        form = AddPostForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+
+        data = {
+            'menu': menu,
+            'title': 'Добавление статьи',
+            'form': form
+        }
+        return render(request, 'women/addpage.html', data)
+"""
+
+
+class AddPage(CreateView):
+    form_class = AddPostForm
+    # model = Women
+    # fields = '__all__'
+    template_name = 'women/addpage.html'
+    # success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Добавление статьи',
+    }
+
+class UpdatePage(UpdateView):
+    model = Women
+    fields = ['title', 'content', 'photo', 'is_published', 'cat']
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Редактирование статьи',
+    }
 
 def contact(request):
     return HttpResponse("Обратная связь")
@@ -91,6 +181,23 @@ def show_category(request, cat_slug):
         'cat_selected': category.pk,
     }
     return render(request, 'women/index.html', context=data)
+
+
+class WomenCategory(ListView):
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+    allow_empty = False
+
+    def get_queryset(self):
+        return Women.published.filter(cat__slug=self.kwargs['cat_slug']).select_related('cat')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        cat = context['posts'][0].cat
+        context['title'] = 'Категория - ' + cat.name
+        context['menu'] = menu
+        context['cat_selected'] = cat.pk
+        return context
 
 def page_not_found(request, exception):
     return HttpResponseNotFound("<h1>Страница не найдена</h1>")
